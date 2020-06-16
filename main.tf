@@ -176,37 +176,52 @@ resource "aws_db_subnet_group" "hasura" {
   subnet_ids = aws_subnet.hasura_private.*.id
 }
 
-resource "aws_db_instance" "hasura" {
-  name                   = var.rds_db_name
-  identifier             = "hasura"
-  username               = var.rds_username
-  password               = var.rds_password
-  port                   = "5432"
-  engine                 = "postgres"
-  engine_version         = "10.5"
-  instance_class         = var.rds_instance
-  allocated_storage      = "10"
-  storage_encrypted      = false
+# resource "aws_db_instance" "hasura" {
+#   name                   = var.rds_db_name
+#   identifier             = "hasura"
+#   username               = var.rds_username
+#   password               = var.rds_password
+#   port                   = "5432"
+#   engine                 = "postgres"
+#   engine_version         = "10.5"
+#   instance_class         = var.rds_instance
+#   allocated_storage      = "10"
+#   storage_encrypted      = false
+#   vpc_security_group_ids = [aws_security_group.hasura_rds.id]
+#   db_subnet_group_name   = aws_db_subnet_group.hasura.name
+#   parameter_group_name   = "default.postgres10"
+#   multi_az               = var.multi_az
+#   storage_type           = "gp2"
+#   publicly_accessible    = false
+
+#   # snapshot_identifier       = "hasura"
+#   allow_major_version_upgrade = false
+#   auto_minor_version_upgrade  = false
+#   apply_immediately           = true
+#   maintenance_window          = "sun:02:00-sun:04:00"
+#   skip_final_snapshot         = true
+#   copy_tags_to_snapshot       = true
+#   backup_retention_period     = 7
+#   backup_window               = "04:00-06:00"
+#   final_snapshot_identifier   = "hasura2"
+
+#   lifecycle {
+#     prevent_destroy = false
+#   }
+# }
+
+resource "aws_rds_cluster" "hasura_aurora" {
+  database_name          = var.rds_db_name
+  master_username        = var.rds_username
+  master_password        = var.rds_password
+  engine                 = "aurora-postgresql"
+  engine_mode            = "serverless"
   vpc_security_group_ids = [aws_security_group.hasura_rds.id]
   db_subnet_group_name   = aws_db_subnet_group.hasura.name
-  parameter_group_name   = "default.postgres10"
-  multi_az               = var.multi_az
-  storage_type           = "gp2"
-  publicly_accessible    = false
-
-  # snapshot_identifier       = "hasura"
-  allow_major_version_upgrade = false
-  auto_minor_version_upgrade  = false
-  apply_immediately           = true
-  maintenance_window          = "sun:02:00-sun:04:00"
-  skip_final_snapshot         = false
-  copy_tags_to_snapshot       = true
-  backup_retention_period     = 7
-  backup_window               = "04:00-06:00"
-  final_snapshot_identifier   = "hasura"
-
+  skip_final_snapshot    = true
+  final_snapshot_identifier   = "hasuraaurora"
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy = false
   }
 }
 
@@ -215,7 +230,7 @@ resource "aws_db_instance" "hasura" {
 # -----------------------------------------------------------------------------
 
 resource "aws_ecs_cluster" "hasura" {
-  name = "${var.ecs_cluster_name}"
+  name = var.ecs_cluster_name
 }
 
 # -----------------------------------------------------------------------------
@@ -284,7 +299,7 @@ locals {
     },
     {
       name  = "HASURA_GRAPHQL_DATABASE_URL",
-      value = "postgres://${var.rds_username}:${var.rds_password}@${aws_db_instance.hasura.endpoint}/${var.rds_db_name}"
+      value = "postgres://${var.rds_username}:${var.rds_password}@${aws_rds_cluster.hasura_aurora.endpoint}/${var.rds_db_name}"
     },
     {
       name  = "HASURA_GRAPHQL_ENABLE_CONSOLE",
@@ -297,10 +312,6 @@ locals {
     {
       name  = "HASURA_GRAPHQL_PG_CONNECTIONS",
       value = "100"
-    },
-    {
-      name  = "HASURA_GRAPHQL_JWT_SECRET",
-      value = "{\"type\":\"${var.hasura_jwt_secret_algo}\", \"key\": \"${var.hasura_jwt_secret_key}\"}"
     }
   ]
 

@@ -12,7 +12,7 @@
 
 variable "region" {
   description = "Region to deploy"
-  default     = "ap-northeast-1" # Asia Pacific Tokyo
+  default     = "us-east-2" # Ohio
 }
 
 variable "domain" {
